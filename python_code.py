@@ -472,3 +472,184 @@ def accuracy():
         f"Same-person pairs = {same_total}\n"
         f"Different-person pairs = {different_total}"
     )
+
+# ============================================================
+# SIMPLE GRADIO GUI
+# ============================================================
+
+with gr.Blocks(title="PCA Face Recognition") as app:
+
+    gr.Markdown(
+        """
+# PCA Face Recognition Across Different Ages
+
+**Project 11 Mathematics + Cross-Age Face Verification**
+
+PCA → Eigenfaces → Projection → Face Recognition →
+Same Person at Different Ages
+"""
+    )
+
+    with gr.Tab("PCA"):
+
+        load = gr.Button(
+            "Load Database + Run PCA",
+            variant="primary"
+        )
+
+        status = gr.Textbox(
+            label="PCA Results",
+            lines=10
+        )
+
+        with gr.Row():
+            mean = gr.Image(
+                label="Mean Face"
+            )
+
+            eigen = gr.Image(
+                label="First Eigenface"
+            )
+
+        load.click(
+            load_database,
+            outputs=status
+        )
+
+        load.click(
+            show_mean_face,
+            outputs=mean
+        )
+
+        load.click(
+            show_eigenface,
+            outputs=eigen
+        )
+
+    with gr.Tab("Face Recognition"):
+
+        face = gr.Image(
+            type="filepath",
+            label="Upload Face"
+        )
+
+        recognize_button = gr.Button(
+            "Recognize Face",
+            variant="primary"
+        )
+
+        recognition_result = gr.Textbox(
+            label="Result",
+            lines=8
+        )
+
+        recognize_button.click(
+            recognize,
+            inputs=face,
+            outputs=recognition_result
+        )
+
+    with gr.Tab("Projection / Reconstruction"):
+
+        reconstruction_face = gr.Image(
+            type="filepath",
+            label="Upload Face"
+        )
+
+        reconstruction_button = gr.Button(
+            "Project and Reconstruct"
+        )
+
+        reconstructed = gr.Image(
+            label="Reconstructed Face"
+        )
+
+        reconstruction_result = gr.Textbox(
+            label="Mathematics",
+            lines=8
+        )
+
+        reconstruction_button.click(
+            reconstruct,
+            inputs=reconstruction_face,
+            outputs=[
+                reconstructed,
+                reconstruction_result
+            ]
+        )
+
+    with gr.Tab("Different Ages"):
+
+        gr.Markdown(
+            """
+## Same Person at Different Ages
+
+Upload two CACD images.
+
+The program projects both faces into the same PCA space and
+compares their feature vectors.
+
+\[
+W_1 = V^T(U_1-\bar U)
+\]
+
+\[
+W_2 = V^T(U_2-\bar U)
+\]
+
+\[
+d = ||W_1-W_2||_2
+\]
+
+A smaller distance means the PCA representations are more similar.
+"""
+        )
+
+        with gr.Row():
+
+            face1 = gr.Image(
+                type="filepath",
+                label="Face 1"
+            )
+
+            face2 = gr.Image(
+                type="filepath",
+                label="Face 2"
+            )
+
+        verify = gr.Button(
+            "Verify Same Person",
+            variant="primary"
+        )
+
+        verification = gr.Textbox(
+            label="Verification",
+            lines=12
+        )
+
+        verify.click(
+            verify_faces,
+            inputs=[
+                face1,
+                face2
+            ],
+            outputs=verification
+        )
+
+        accuracy_button = gr.Button(
+            "Calculate Cross-Age Accuracy"
+        )
+
+        accuracy_result = gr.Textbox(
+            label="Accuracy",
+            lines=8
+        )
+
+        accuracy_button.click(
+            accuracy,
+            outputs=accuracy_result
+        )
+
+
+if __name__ == "__main__":
+    app.launch(inbrowser=True)
