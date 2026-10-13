@@ -275,3 +275,200 @@ def recognize(path):
         f"Distance: {distances[nearest]:.2f}\n\n"
         "Smallest PCA distance = closest face."
     )
+
+# ============================================================
+# CROSS-AGE / SAME-PERSON VERIFICATION
+# ============================================================
+
+def verify_faces(path1, path2):
+    if eigenfaces is None:
+        return "Run PCA first."
+
+    if path1 is None or path2 is None:
+        return "Upload both faces."
+
+    image1 = read_image(path1)
+    image2 = read_image(path2)
+
+    U1 = image1.reshape(-1)
+    U2 = image2.reshape(-1)
+
+    # PCA projections
+    W1 = eigenfaces.T @ (U1 - mean_face)
+    W2 = eigenfaces.T @ (U2 - mean_face)
+
+    # Euclidean distance in PCA space
+    distance = np.linalg.norm(W1 - W2)
+
+    # If these files come from CACD, obtain their IDs
+    id1 = get_person_id(path1)
+    id2 = get_person_id(path2)
+
+    same_actual_person = (id1 == id2)
+
+    if same_actual_person:
+        actual = "SAME PERSON"
+    else:
+        actual = "DIFFERENT PEOPLE"
+
+    # A simple data-based threshold
+    threshold = get_threshold()
+
+    if threshold is None:
+        decision = "THRESHOLD NOT AVAILABLE"
+    elif distance <= threshold:
+        decision = "SAME PERSON"
+    else:
+        decision = "DIFFERENT PEOPLE"
+
+    return (
+        "CROSS-AGE FACE VERIFICATION\n\n"
+        f"Face 1: {os.path.basename(path1)}\n"
+        f"Person ID: {id1}\n\n"
+        f"Face 2: {os.path.basename(path2)}\n"
+        f"Person ID: {id2}\n\n"
+        f"PCA distance = {distance:.2f}\n"
+        f"Threshold = {threshold:.2f}\n\n"
+        f"Predicted: {decision}\n"
+        f"Dataset label: {actual}\n\n"
+        "Mathematics:\n"
+        "W1 = V^T(U1 - mean)\n"
+        "W2 = V^T(U2 - mean)\n"
+        "d = ||W1 - W2||"
+    )
+
+
+# ============================================================
+# LEARN A SIMPLE THRESHOLD
+#
+# Same-person pairs should generally have smaller distances.
+# Different-person pairs should generally have larger distances.
+# ============================================================
+
+def get_threshold():
+    if features is None:
+        return None
+
+    same = []
+    different = []
+
+    n = len(person_ids)
+
+    # Limit number of pairs so it stays fast
+    pair_limit = 5000
+    count = 0
+
+    for i in range(n):
+        for j in range(i + 1, n):
+
+            distance = np.linalg.norm(
+                features[:, i] - features[:, j]
+            )
+
+            if person_ids[i] == person_ids[j]:
+                same.append(distance)
+            else:
+                different.append(distance)
+
+            count += 1
+
+            if count >= pair_limit:
+                break
+
+        if count >= pair_limit:
+            break
+
+    if len(same) == 0 or len(different) == 0:
+        return None
+
+    # Simple midpoint between average same-person
+    # and average different-person distances.
+    same_mean = np.mean(same)
+    different_mean = np.mean(different)
+
+    return (same_mean + different_mean) / 2
+# ============================================================
+# CROSS-AGE ACCURACY
+# ============================================================
+
+def accuracy():
+    if features is None:
+        return "Run PCA first."
+
+    threshold = get_threshold()
+
+    if threshold is None:
+        return (
+            "Not enough repeated person IDs in the loaded data "
+            "to calculate cross-age verification."
+        )
+
+    same_correct = 0
+    same_total = 0
+
+    different_correct = 0
+    different_total = 0
+
+    n = len(person_ids)
+    count = 0
+    pair_limit = 5000
+
+    for i in range(n):
+        for j in range(i + 1, n):
+
+            distance = np.linalg.norm(
+                features[:, i] - features[:, j]
+            )
+
+            actual_same = (
+                person_ids[i] == person_ids[j]
+            )
+
+            predicted_same = (
+                distance <= threshold
+            )
+
+            if actual_same:
+                same_total += 1
+                if predicted_same:
+                    same_correct += 1
+            else:
+                different_total += 1
+                if not predicted_same:
+                    different_correct += 1
+
+            count += 1
+
+            if count >= pair_limit:
+                break
+
+        if count >= pair_limit:
+            break
+
+    total = same_total + different_total
+
+    if total == 0:
+        return "No pairs available."
+
+    correct = same_correct + different_correct
+    total_accuracy = correct / total * 100
+
+    same_accuracy = (
+        same_correct / same_total * 100
+        if same_total else 0
+    )
+
+    different_accuracy = (
+        different_correct / different_total * 100
+        if different_total else 0
+    )
+
+    return (
+        "CROSS-AGE RECOGNITION RESULTS\n\n"
+        f"Threshold = {threshold:.2f}\n\n"
+        f"Same-person accuracy = {same_accuracy:.2f}%\n"
+        f"Different-person accuracy = {different_accuracy:.2f}%\n"
+        f"Overall accuracy = {total_accuracy:.2f}%\n\n"
+        f"Same-person pairs = {same_total}\n"
+        f"Different-person pairs = {different_total}"
+    )
