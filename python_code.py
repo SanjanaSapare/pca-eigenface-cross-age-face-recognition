@@ -172,3 +172,106 @@ def load_database():
 # ============================================================
 # SHOW MEAN FACE
 # ============================================================
+def show_mean_face():
+    if mean_face is None:
+        return None
+
+    image = mean_face.reshape(HEIGHT, WIDTH)
+    image = normalize(image)
+    return Image.fromarray(image)
+
+
+# ============================================================
+# SHOW FIRST EIGENFACE
+# ============================================================
+
+def show_eigenface():
+    if eigenfaces is None:
+        return None
+
+    image = eigenfaces[:, 0].reshape(HEIGHT, WIDTH)
+    image = normalize(image)
+    return Image.fromarray(image)
+
+
+# ============================================================
+# NORMALIZE IMAGE FOR DISPLAY
+# ============================================================
+
+def normalize(image):
+    image = np.asarray(image)
+
+    low = image.min()
+    high = image.max()
+
+    if high == low:
+        return np.zeros(image.shape, dtype=np.uint8)
+
+    image = (image - low) / (high - low) * 255
+    return image.astype(np.uint8)
+
+
+# ============================================================
+# RECONSTRUCT A FACE
+# ============================================================
+
+def reconstruct(path):
+    if eigenfaces is None:
+        return None, "Run PCA first."
+
+    if path is None:
+        return None, "Upload/select a face."
+
+    image = read_image(path)
+    U = image.reshape(-1)
+
+    # Projection
+    W = eigenfaces.T @ (U - mean_face)
+
+    # Reconstruction
+    U_approx = eigenfaces @ W + mean_face
+
+    reconstructed = U_approx.reshape(HEIGHT, WIDTH)
+
+    error = np.linalg.norm(U - U_approx)
+
+    return (
+        Image.fromarray(normalize(reconstructed)),
+        f"Reconstruction error = {error:.2f}\n\n"
+        "W = V^T(U - mean)\n"
+        "U_approx = V W + mean"
+    )
+
+
+# ============================================================
+# FACE RECOGNITION
+# ============================================================
+
+def recognize(path):
+    if features is None:
+        return "Run PCA first."
+
+    if path is None:
+        return "Upload a face."
+
+    image = read_image(path)
+    U = image.reshape(-1)
+
+    # Project query face
+    W_query = eigenfaces.T @ (U - mean_face)
+
+    # Distance from query to every database face
+    distances = np.linalg.norm(
+        features - W_query.reshape(-1, 1),
+        axis=0
+    )
+
+    nearest = np.argmin(distances)
+
+    return (
+        "FACE RECOGNITION\n\n"
+        f"Predicted person ID: {person_ids[nearest]}\n"
+        f"Matched image: {os.path.basename(file_paths[nearest])}\n"
+        f"Distance: {distances[nearest]:.2f}\n\n"
+        "Smallest PCA distance = closest face."
+    )
